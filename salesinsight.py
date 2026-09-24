@@ -1,5 +1,6 @@
 import csv
 import os
+import json
 import re
 from datetime import datetime
 from collections import defaultdict
@@ -162,6 +163,82 @@ def segmentar_clientes(registros):
 
     return clientes_ordenados
 
+def processar_coluna(registros, coluna, funcao_transformacao, nome_saida=None):
+    """
+    RF07 - Função de Ordem Superior.
+    
+    Recebe uma função de transformação como argumento e a aplica em um
+    campo específico de cada registro do dataset.
+    """
+    # Se o usuário não definir um nome de saída, criamos um padrão automático
+    if nome_saida is None:
+        nome_saida = f"{coluna}_transformado"
+        
+    for linha in registros:
+        # Aplica a função matemática/lógica passada por argumento na coluna escolhida
+        linha[nome_saida] = funcao_transformacao(linha[coluna])
+        
+    return registros
+
+def exportar_resultados(metricas, clientes, dados_completos, pasta_outputs):
+    """
+    RF08 - Exporta as métricas por mês e a segmentação de clientes para CSV,
+    e gera estatísticas gerais consolidadas em um arquivo JSON, relendo-o em seguida.
+    """
+    # 1. Garante que a pasta 'outputs' existe fisicamente no computador
+    if not os.path.exists(pasta_outputs):
+        os.makedirs(pasta_outputs)
+
+    # 2. EXPORTAÇÃO 1: Métricas Mensais para CSV
+    caminho_metricas = os.path.join(pasta_outputs, "metricas_por_mes.csv")
+    with open(caminho_metricas, mode="w", newline="", encoding="utf-8-sig") as f:
+        # Pega as colunas de faturamento a partir das chaves do primeiro mês encontrado
+        primeiro_mes = list(metricas.keys())[0]
+        colunas_metricas = ["mes"] + list(metricas[primeiro_mes].keys())
+        
+        escritor = csv.DictWriter(f, fieldnames=colunas_metricas)
+        escritor.writeheader()
+        
+        for mes, valores in metricas.items():
+            linha = {"mes": mes}
+            linha.update(valores)
+            escritor.writerow(linha)
+
+    # 3. EXPORTAÇÃO 2: Segmentação de Clientes para CSV
+    caminho_clientes = os.path.join(pasta_outputs, "segmentacao_clientes.csv")
+    with open(caminho_clientes, mode="w", newline="", encoding="utf-8-sig") as f:
+        colunas_clientes = list(clientes[0].keys())
+        escritor = csv.DictWriter(f, fieldnames=colunas_clientes)
+        escritor.writeheader()
+        escritor.writerows(clientes)
+
+    # 4. EXPORTAÇÃO 3: Estatísticas Gerais para JSON
+    # Vamos calcular números rápidos consolidados para a diretoria
+    total_faturamento = sum(item["receita_total"] for item in dados_completos)
+    total_itens_vendidos = sum(item["quantidade"] for item in dados_completos)
+    ticket_medio_geral = total_faturamento / len(dados_completos) if dados_completos else 0
+    
+    estatisticas = {
+        "faturamento_total_acumulado": round(total_faturamento, 2),
+        "total_produtos_vendidos": total_itens_vendidos,
+        "total_transacoes_validas": len(dados_completos),
+        "ticket_medio_geral": round(ticket_medio_geral, 2)
+    }
+
+    caminho_json = os.path.join(pasta_outputs, "estatisticas_gerais.json")
+    with open(caminho_json, mode="w", encoding="utf-8") as f:
+        # Grava formatado com recuo de 4 espaços para ficar fácil de ler
+        json.dump(estatisticas, f, indent=4, ensure_ascii=False)
+
+    print("💾 Arquivos de relatórios gravados com sucesso na pasta 'outputs'!")
+
+    # 5. RELEITURA OBRIGATÓRIA (Corta para validação do professor)
+    print("\n🔍 Realizando a conferência obrigatória do arquivo JSON (json.load)...")
+    with open(caminho_json, mode="r", encoding="utf-8") as f:
+        conferencia = json.load(f)
+        print(f"✅ Conteúdo validado no arquivo JSON: {conferencia}")
+    print("="*60 + "\n")
+
 def main():
     print("="*60)
     print("        SALESINSIGHT PY - Análise de Dados de Vendas        ")
@@ -185,8 +262,40 @@ def main():
     
     print("👥 Iniciando a segmentação e análise de clientes...")
     clientes_processados = segmentar_clientes(dados_transformados)
-    
-    print("🎉 Pipeline executado com sucesso até a classificação de clientes!")
 
-if __name__ == "__main__":
-    main()
+        # ... código anterior (clientes_processados = segmentar_clientes...)
+    
+    # === NOVA ETAPA DE FUNÇÃO DE ORDEM SUPERIOR ADICIONADA AQUI (RF07) ===
+    print("🧠 Aplicando transformações com Função de Ordem Superior...")
+    
+    # Teste 1: Criar uma coluna expressando a receita em milhares (dividindo por 1000)
+    dados_transformados = processar_coluna(
+        dados_transformados, 
+        coluna="receita_total", 
+        funcao_transformacao=lambda x: round(x / 1000, 2), 
+        nome_saida="receita_em_milhares"
+    )
+    
+    # Teste 2: Classificar o volume da venda baseado na quantidade (Alto Volume se for maior que 5)
+    dados_transformados = processar_coluna(
+        dados_transformados, 
+        coluna="quantidade", 
+        funcao_transformacao=lambda q: "Alto Volume" if q > 5 else "Baixo Volume", 
+        nome_saida="perfil_volume"
+    )
+    
+    # ... código anterior (Função de Ordem Superior) ...
+    print("🧠 Aplicando transformações com Função de Ordem Superior...")
+    dados_transformados = processar_coluna(dados_transformados, "receita_total", lambda x: round(x / 1000, 2), "receita_em_milhares")
+    dados_transformados = processar_coluna(dados_transformados, "quantidade", lambda q: "Alto Volume" if q > 5 else "Baixo Volume", "perfil_volume")
+    
+    # === NOVA ETAPA DE EXPORTAÇÃO ADICIONADA AQUI (RF08) ===
+    print("💾 Iniciando a gravação dos relatórios finais de negócios...")
+    # Define a pasta outputs ao lado do script
+    pasta_outputs = os.path.join(pasta_atual, "outputs")
+    
+    exportar_resultados(dados_agregados, clientes_processados, dados_transformados, pasta_outputs)
+    
+    print("🚀 [CONCLUÍDO] O fluxo do pipeline SalesInsight foi executado de ponta a ponta sem erros!")
+    print("="*60)
+
