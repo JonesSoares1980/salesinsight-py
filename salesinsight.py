@@ -245,13 +245,15 @@ def main():
     dados_transformados = processar_coluna(dados_transformados, "receita_total", lambda x: round(x / 1000, 2), "receita_em_milhares")
     dados_transformados = processar_coluna(dados_transformados, "quantidade", lambda q: "Alto Volume" if q > 5 else "Baixo Volume", "perfil_volume")
     
+    # 🔍 PRESTE ATENÇÃO NESSA MARGEM AQUI ABAIXO:
+    # Elas NÃO podem estar encostadas na parede esquerda! Devem ter 4 espaços de recuo.
     print("💾 Iniciando a gravação dos relatórios finais de negócios...")
+    pasta_outputs = os.path.join(pasta_atual, "outputs")
+    exportar_resultados(dados_agregados, clientes_processados, dados_transformados, pasta_outputs)
+    
+    print("🚀 [CONCLUÍDO] O fluxo do pipeline SalesInsight foi executado de ponta a ponta sem erros!")
+    print("="*60)
 
-pasta_outputs = os.path.join(pasta_atual, "outputs")
-exportar_resultados(dados_agregados, clientes_processados, dados_transformados, pasta_outputs)
-
-print("🚀 [CONCLUÍDO] O fluxo do pipeline SalesInsight foi executado de ponta a ponta sem erros!")
-print("="*60)
-
-if name == "main":
+# O bloco abaixo fica encostado na parede esquerda (sem espaços antes do if)
+if __name__ == "__main__":
     main()
